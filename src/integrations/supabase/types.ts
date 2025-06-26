@@ -9,7 +9,157 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      asset_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      assets: {
+        Row: {
+          average_price: number | null
+          category_id: string | null
+          created_at: string
+          current_price: number | null
+          current_value: number | null
+          id: string
+          name: string
+          quantity: number | null
+          ticker: string
+          total_invested: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          average_price?: number | null
+          category_id?: string | null
+          created_at?: string
+          current_price?: number | null
+          current_value?: number | null
+          id?: string
+          name: string
+          quantity?: number | null
+          ticker: string
+          total_invested?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          average_price?: number | null
+          category_id?: string | null
+          created_at?: string
+          current_price?: number | null
+          current_value?: number | null
+          id?: string
+          name?: string
+          quantity?: number | null
+          ticker?: string
+          total_invested?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          asset_id: string
+          created_at: string
+          fees: number | null
+          id: string
+          price: number
+          quantity: number
+          total_amount: number
+          transaction_date: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          fees?: number | null
+          id?: string
+          price: number
+          quantity: number
+          total_amount: number
+          transaction_date: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          fees?: number | null
+          id?: string
+          price?: number
+          quantity?: number
+          total_amount?: number
+          transaction_date?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
