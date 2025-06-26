@@ -33,6 +33,35 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_subcategories: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
           average_price: number | null
@@ -43,6 +72,7 @@ export type Database = {
           id: string
           name: string
           quantity: number | null
+          subcategory_id: string | null
           ticker: string
           total_invested: number | null
           updated_at: string
@@ -57,6 +87,7 @@ export type Database = {
           id?: string
           name: string
           quantity?: number | null
+          subcategory_id?: string | null
           ticker: string
           total_invested?: number | null
           updated_at?: string
@@ -71,6 +102,7 @@ export type Database = {
           id?: string
           name?: string
           quantity?: number | null
+          subcategory_id?: string | null
           ticker?: string
           total_invested?: number | null
           updated_at?: string
@@ -82,6 +114,66 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "asset_subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dividends: {
+        Row: {
+          amount: number
+          amount_per_share: number
+          asset_id: string
+          created_at: string
+          ex_dividend_date: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          record_date: string | null
+          shares_quantity: number
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          amount_per_share: number
+          asset_id: string
+          created_at?: string
+          ex_dividend_date?: string | null
+          id?: string
+          notes?: string | null
+          payment_date: string
+          record_date?: string | null
+          shares_quantity: number
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          amount_per_share?: number
+          asset_id?: string
+          created_at?: string
+          ex_dividend_date?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          record_date?: string | null
+          shares_quantity?: number
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dividends_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
             referencedColumns: ["id"]
           },
         ]
@@ -160,12 +252,57 @@ export type Database = {
           },
         ]
       }
+      watchlist: {
+        Row: {
+          change_24h: number | null
+          change_percent_24h: number | null
+          created_at: string
+          current_price: number | null
+          id: string
+          last_updated: string | null
+          market_cap: number | null
+          name: string
+          ticker: string
+          user_id: string
+          volume_24h: number | null
+        }
+        Insert: {
+          change_24h?: number | null
+          change_percent_24h?: number | null
+          created_at?: string
+          current_price?: number | null
+          id?: string
+          last_updated?: string | null
+          market_cap?: number | null
+          name: string
+          ticker: string
+          user_id: string
+          volume_24h?: number | null
+        }
+        Update: {
+          change_24h?: number | null
+          change_percent_24h?: number | null
+          created_at?: string
+          current_price?: number | null
+          id?: string
+          last_updated?: string | null
+          market_cap?: number | null
+          name?: string
+          ticker?: string
+          user_id?: string
+          volume_24h?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_asset_prices: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

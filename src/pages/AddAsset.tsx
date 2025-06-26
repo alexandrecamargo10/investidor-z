@@ -1,197 +1,247 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarIcon, Plus, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { Loader2, Plus, Search } from "lucide-react";
+
+interface Category {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+  category_id: string;
+}
+
+interface StockData {
+  ticker: string;
+  name: string;
+  currentPrice: number;
+  currency: string;
+}
 
 export default function AddAsset() {
+  const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [filteredSubcategories, setFilteredSubcategories] = useState<Subcategory[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchingStock, setSearchingStock] = useState(false);
+
   const [formData, setFormData] = useState({
-    ticker: "",
-    name: "",
-    category: "",
-    subcategory: "",
-    operationType: "buy",
-    quantity: "",
-    price: "",
-    date: "",
-    fees: ""
+    ticker: '',
+    name: '',
+    categoryId: '',
+    subcategoryId: '',
+    quantity: '',
+    price: '',
+    type: 'buy' as 'buy' | 'sell'
   });
 
-  const categories = {
-    "Ação": ["Bancos", "Tecnologia", "Energia", "Mineração", "Varejo", "Telecomunicações"],
-    "FII": ["Tijolo", "Papel", "Logística", "Shoppings", "Hospitalar"],
-    "Renda Fixa": ["Tesouro Direto", "CDB", "LCI/LCA", "Debêntures"],
-    "Criptomoeda": ["Bitcoin", "Ethereum", "Altcoins"]
-  };
+  useEffect(() => {
+    fetchCategories();
+    fetchSubcategories();
+  }, []);
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-      // Reset subcategory when category changes
-      ...(field === 'category' && { subcategory: '' })
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Basic validation
-    if (!formData.ticker || !formData.category || !formData.quantity || !formData.price) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos obrigatórios.",
-        variant: "destructive"
-      });
-      return;
+  useEffect(() => {
+    if (formData.categoryId) {
+      const filtered = subcategories.filter(sub => sub.category_id === formData.categoryId);
+      setFilteredSubcategories(filtered);
+    } else {
+      setFilteredSubcategories([]);
     }
+  }, [formData.categoryId, subcategories]);
 
-    // Simulate API call
-    console.log("Form submitted:", formData);
-    
-    toast({
-      title: "Ativo adicionado com sucesso!",
-      description: `${formData.operationType === 'buy' ? 'Compra' : 'Venda'} de ${formData.quantity} ${formData.ticker} registrada.`,
-    });
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('asset_categories')
+        .select('*')
+        .order('name');
 
-    // Reset form
-    setFormData({
-      ticker: "",
-      name: "",
-      category: "",
-      subcategory: "",
-      operationType: "buy",
-      quantity: "",
-      price: "",
-      date: "",
-      fees: ""
-    });
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar categorias:', error);
+    }
   };
 
-  const searchAsset = () => {
-    // Simulate asset search
-    if (formData.ticker) {
-      // Mock data for demonstration
-      const mockAssets: Record<string, any> = {
-        "ITUB4": { name: "Itaú Unibanco", category: "Ação", subcategory: "Bancos" },
-        "VALE3": { name: "Vale S.A.", category: "Ação", subcategory: "Mineração" },
-        "HGLG11": { name: "CSHG Logística", category: "FII", subcategory: "Logística" }
-      };
+  const fetchSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('asset_subcategories')
+        .select('*')
+        .order('name');
 
-      const asset = mockAssets[formData.ticker.toUpperCase()];
-      if (asset) {
+      if (error) throw error;
+      setSubcategories(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar subcategorias:', error);
+    }
+  };
+
+  const searchStock = async () => {
+    if (!formData.ticker.trim()) return;
+
+    setSearchingStock(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-stock-data', {
+        body: { ticker: formData.ticker.toUpperCase() }
+      });
+
+      if (error) throw error;
+
+      if (data) {
         setFormData(prev => ({
           ...prev,
-          name: asset.name,
-          category: asset.category,
-          subcategory: asset.subcategory
+          name: data.name,
+          price: data.currentPrice.toString()
         }));
+        
         toast({
           title: "Ativo encontrado!",
-          description: `${asset.name} foi identificado automaticamente.`,
-        });
-      } else {
-        toast({
-          title: "Ativo não encontrado",
-          description: "Você pode preencher as informações manualmente.",
-          variant: "destructive"
+          description: `${data.name} - R$ ${data.currentPrice.toFixed(2)}`,
         });
       }
+    } catch (error) {
+      console.error('Erro ao buscar dados do ativo:', error);
+      toast({
+        title: "Erro ao buscar ativo",
+        description: "Não foi possível obter dados do ativo. Preencha manualmente.",
+        variant: "destructive"
+      });
+    } finally {
+      setSearchingStock(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      // First, check if asset already exists
+      const { data: existingAsset } = await supabase
+        .from('assets')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('ticker', formData.ticker.toUpperCase())
+        .single();
+
+      const quantity = parseFloat(formData.quantity);
+      const price = parseFloat(formData.price);
+      const totalAmount = quantity * price;
+
+      if (existingAsset) {
+        // Update existing asset
+        const newQuantity = formData.type === 'buy' 
+          ? existingAsset.quantity + quantity
+          : existingAsset.quantity - quantity;
+
+        const newTotalInvested = formData.type === 'buy'
+          ? existingAsset.total_invested + totalAmount
+          : existingAsset.total_invested - totalAmount;
+
+        const newAveragePrice = newQuantity > 0 ? newTotalInvested / newQuantity : 0;
+
+        const { error: updateError } = await supabase
+          .from('assets')
+          .update({
+            quantity: newQuantity,
+            average_price: newAveragePrice,
+            current_price: price,
+            total_invested: newTotalInvested,
+            current_value: newQuantity * price,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingAsset.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Create new asset
+        const { error: insertAssetError } = await supabase
+          .from('assets')
+          .insert({
+            user_id: user.id,
+            ticker: formData.ticker.toUpperCase(),
+            name: formData.name,
+            category_id: formData.categoryId || null,
+            subcategory_id: formData.subcategoryId || null,
+            quantity: formData.type === 'buy' ? quantity : -quantity,
+            average_price: price,
+            current_price: price,
+            total_invested: formData.type === 'buy' ? totalAmount : -totalAmount,
+            current_value: quantity * price
+          });
+
+        if (insertAssetError) throw insertAssetError;
+      }
+
+      // Add transaction record
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          asset_id: existingAsset?.id || null, // We'd need to get the new asset ID for new assets
+          type: formData.type,
+          quantity: quantity,
+          price: price,
+          total_amount: totalAmount,
+          transaction_date: new Date().toISOString().split('T')[0]
+        });
+
+      if (transactionError) console.error('Transaction error:', transactionError);
+
+      toast({
+        title: "Ativo adicionado com sucesso!",
+        description: `${formData.ticker} foi ${formData.type === 'buy' ? 'comprado' : 'vendido'}.`,
+      });
+
+      navigate('/portfolio');
+    } catch (error) {
+      console.error('Erro ao adicionar ativo:', error);
+      toast({
+        title: "Erro ao adicionar ativo",
+        description: "Ocorreu um erro. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Adicionar Ativo</h1>
-        <p className="text-slate-600 mt-1">Registre uma nova operação de compra ou venda</p>
+        <p className="text-slate-600 mt-1">Registre uma nova compra ou venda de ativo</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Form */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Informações da Operação</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Asset Search */}
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle>Informações do Ativo</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="ticker">Ticker / Código do Ativo *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="ticker"
-                    placeholder="Ex: ITUB4, VALE3, HGLG11"
-                    value={formData.ticker}
-                    onChange={(e) => handleInputChange('ticker', e.target.value.toUpperCase())}
-                    className="flex-1"
-                  />
-                  <Button type="button" variant="outline" onClick={searchAsset}>
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Asset Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome do Ativo</Label>
-                <Input
-                  id="name"
-                  placeholder="Nome será preenchido automaticamente"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                />
-              </div>
-
-              {/* Category and Subcategory */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Categoria *</Label>
-                  <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(categories).map(category => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Subcategoria</Label>
-                  <Select 
-                    value={formData.subcategory} 
-                    onValueChange={(value) => handleInputChange('subcategory', value)}
-                    disabled={!formData.category}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a subcategoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.category && categories[formData.category as keyof typeof categories]?.map(subcategory => (
-                        <SelectItem key={subcategory} value={subcategory}>
-                          {subcategory}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Operation Type */}
-              <div className="space-y-2">
-                <Label>Tipo de Operação *</Label>
-                <Select value={formData.operationType} onValueChange={(value) => handleInputChange('operationType', value)}>
+                <Label htmlFor="type">Tipo de Operação</Label>
+                <Select value={formData.type} onValueChange={(value: 'buy' | 'sell') => 
+                  setFormData(prev => ({ ...prev, type: value }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -202,118 +252,148 @@ export default function AddAsset() {
                 </Select>
               </div>
 
-              {/* Quantity and Price */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantidade *</Label>
+              <div className="space-y-2">
+                <Label htmlFor="ticker">Ticker</Label>
+                <div className="flex gap-2">
                   <Input
-                    id="quantity"
-                    type="number"
-                    placeholder="Ex: 100"
-                    value={formData.quantity}
-                    onChange={(e) => handleInputChange('quantity', e.target.value)}
+                    id="ticker"
+                    value={formData.ticker}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      ticker: e.target.value.toUpperCase() 
+                    }))}
+                    placeholder="Ex: ITUB4, VALE3"
+                    required
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="price">Preço Unitário (R$) *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    placeholder="Ex: 32.45"
-                    value={formData.price}
-                    onChange={(e) => handleInputChange('price', e.target.value)}
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={searchStock}
+                    disabled={searchingStock || !formData.ticker.trim()}
+                  >
+                    {searchingStock ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
+            </div>
 
-              {/* Date and Fees */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="date">Data da Operação</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => handleInputChange('date', e.target.value)}
-                  />
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome do Ativo</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Nome completo do ativo"
+                required
+              />
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="fees">Taxas e Custos (R$)</Label>
-                  <Input
-                    id="fees"
-                    type="number"
-                    step="0.01"
-                    placeholder="Ex: 15.50"
-                    value={formData.fees}
-                    onChange={(e) => handleInputChange('fees', e.target.value)}
-                  />
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoria</Label>
+                <Select value={formData.categoryId} onValueChange={(value) => 
+                  setFormData(prev => ({ ...prev, categoryId: value, subcategoryId: '' }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Submit Button */}
-              <Button type="submit" className="w-full bg-financialBlue-600 hover:bg-financialBlue-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Registrar Operação
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+              <div className="space-y-2">
+                <Label htmlFor="subcategory">Subcategoria</Label>
+                <Select 
+                  value={formData.subcategoryId} 
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, subcategoryId: value }))}
+                  disabled={!formData.categoryId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a subcategoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredSubcategories.map((subcategory) => (
+                      <SelectItem key={subcategory.id} value={subcategory.id}>
+                        {subcategory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-        {/* Summary Sidebar */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Resumo da Operação</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-slate-50 rounded-lg">
-              <h4 className="font-medium text-slate-900 mb-3">Detalhes</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Ativo:</span>
-                  <span className="font-medium">{formData.ticker || '-'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Operação:</span>
-                  <span className="font-medium">
-                    {formData.operationType === 'buy' ? 'Compra' : 'Venda'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Quantidade:</span>
-                  <span className="font-medium">{formData.quantity || '-'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Preço Unit.:</span>
-                  <span className="font-medium">
-                    {formData.price ? `R$ ${formData.price}` : '-'}
-                  </span>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantidade</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  step="0.00000001"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData(prev => ({ ...prev, quantity: e.target.value }))}
+                  placeholder="0"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="price">Preço por Unidade (R$)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                  placeholder="0.00"
+                  required
+                />
               </div>
             </div>
 
             {formData.quantity && formData.price && (
-              <div className="p-4 bg-financialBlue-50 rounded-lg border border-financialBlue-200">
-                <h4 className="font-medium text-financialBlue-900 mb-2">Valor Total</h4>
-                <p className="text-2xl font-bold text-financialBlue-600">
+              <div className="p-4 bg-slate-50 rounded-lg">
+                <p className="text-sm text-slate-600">Total da Operação:</p>
+                <p className="text-2xl font-bold text-slate-900">
                   R$ {(parseFloat(formData.quantity) * parseFloat(formData.price)).toFixed(2)}
                 </p>
-                {formData.fees && (
-                  <p className="text-sm text-slate-600 mt-1">
-                    + R$ {formData.fees} (taxas)
-                  </p>
-                )}
               </div>
             )}
 
-            <div className="text-xs text-slate-500 leading-relaxed">
-              <strong>Dica:</strong> Use o botão de busca para preencher automaticamente as informações do ativo.
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/portfolio')}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading} className="flex-1">
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar Ativo
+                  </>
+                )}
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
