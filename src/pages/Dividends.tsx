@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,7 +92,14 @@ export default function Dividends() {
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
-      setDividends(data || []);
+      
+      // Cast the type property to ensure TypeScript compatibility
+      const typedDividends = (data || []).map(dividend => ({
+        ...dividend,
+        type: dividend.type as 'dividend' | 'jcp'
+      }));
+      
+      setDividends(typedDividends);
     } catch (error) {
       console.error('Erro ao buscar dividendos:', error);
     }
